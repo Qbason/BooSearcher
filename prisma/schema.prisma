@@ -1,0 +1,174 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  //required by auth.js
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?         @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  // Optional for WebAuthn support
+  Authenticator Authenticator[]
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  //Others
+  SearchRequest SearchRequest[]
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Optional for WebAuthn support
+model Authenticator {
+  id                   String  @id @default(auto()) @map("_id") @db.ObjectId
+  credentialID         String  @unique
+  userId               String  @db.ObjectId
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// related to app directly
+
+model SearchRequest {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  created       DateTime  @default(now())
+  name          String?
+  url           String
+  searchesCount Int       @default(0)
+  dateStart     DateTime
+  dateEnd       DateTime
+  isRunning     Boolean   @default(false)
+  state         DateState @default(Waiting)
+  lastSearch    DateTime?
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String   @db.ObjectId
+  searches Search[]
+}
+
+model Search {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  dateStart   DateTime
+  dateEnd     DateTime
+  duration    Int
+  offersCount Int
+  status      Status   @default(New)
+
+  offers PlaceState[]
+
+  searchRequestId String        @db.ObjectId
+  searchRequest   SearchRequest @relation(fields: [searchRequestId], references: [id], onDelete: Cascade)
+}
+
+model PlaceState {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  state       State   @default(New)
+  isAvailable Boolean @default(true)
+
+  placeId String @db.ObjectId
+  place   Place  @relation(fields: [placeId], references: [id])
+
+  searchId String @db.ObjectId
+  search   Search @relation(fields: [searchId], references: [id])
+}
+
+model Place {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  urlId            String    @unique
+  title            String
+  reviewScore      Float?
+  price            Float
+  image            String
+  url              String
+  address          String
+  numberOfOpinions Int
+  stars            Int?
+  features         feature[]
+
+  placesState PlaceState[]
+}
+
+type feature {
+  name String
+}
+
+enum State {
+  New
+  Seen
+  Hidden
+  Favorite
+}
+
+enum Status {
+  New
+  Pending
+  Success
+  Failed
+}
+
+enum DateState {
+  Waiting
+  Ready
+  Expired
+}

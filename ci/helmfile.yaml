@@ -1,0 +1,41 @@
+helmDefaults:
+  atomic: true
+  wait: true
+
+repositories:
+  - name: mongodb
+    url: registry-1.docker.io/bitnamicharts
+    oci: true
+
+releases:
+  - name: '{{ requiredEnv "MONGODB_NAME" | replace "/" "-" }}'
+    version: 14.12.1
+    namespace: '{{ requiredEnv "NAMESPACE" | replace "/" "-" }}'
+    chart: mongodb/mongodb
+    historyMax: 10
+    installed: true
+    values:
+      - ./mongodb/values.yaml
+      - auth:
+          rootUser: '{{ requiredEnv "MONGO_INITDB_ROOT_USERNAME" }}'
+          rootPassword: '{{ requiredEnv "MONGO_INITDB_ROOT_PASSWORD" }}'
+          replicaSetKey: '{{ requiredEnv "MONGO_REPLICA_SET_KEY" }}'
+
+  - name: '{{ requiredEnv "WEB_NAME" }}'
+    namespace: '{{ requiredEnv "NAMESPACE" | replace "/" "-" }}'
+    chart: ./web
+    version: 0.1.0
+    installed: true
+    historyMax: 10
+    values:
+      - ./web/values.yaml
+      - imagePullSecrets:
+          - name: '{{ requiredEnv "REGISTRY_SECRET_NAME" }}'
+        image:
+          repository: '{{ requiredEnv "WEB_IMAGE_REPO" }}'
+          tag: '{{ requiredEnv "WEB_DOCKERTAG" }}'
+        ingress:
+          host: '{{ requiredEnv "WEB_SHORT_URL" }}'
+          secretName: '{{ requiredEnv "WEB_SHORT_URL" }}'
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt
