@@ -1,93 +1,57 @@
 # BooSearcher
 
+BooSearcher is an innovative application designed to help users monitor their favorite booking offers for places and accommodations. With BooSearcher, you can easily keep track of new deals and offers that match your preferences. When new offers appear, users receive an email notification with all the necessary details, ensuring you never miss out on the best deals.
 
+## Getting Started
 
-## Getting started
+To start using BooSearcher, simply follow these steps:
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+1. Visit the BooSearcher main page.
+2. Copy the URL of your favorite place along with the desired date range from any booking website.
+3. Paste the copied URL into the field provided on the BooSearcher main page.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+The application is designed to be intuitive and user-friendly, guiding you through the rest of the process.
 
-## Add your files
+## Features
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+- **Email Notifications:** Receive email alerts as soon as new offers that match your criteria are found.
+- **User-Friendly Interface:** Adding your first search request is as simple as copying and pasting a URL.
+- **Watcher System:** BooSearcher employs a sophisticated watcher system that regularly visits booking sites to check for new offers. This system is responsible for ensuring that you are always up to date with the latest deals.
 
-```
-cd existing_repo
-git remote add origin https://gitlab.jakubk.pl/cloud/Qbason/boosearcher.git
-git branch -M main
-git push -uf origin main
-```
+## How It Works
 
-## Integrate with your tools
+BooSearcher uses a powerful `Watcher` mechanism that continuously monitors booking websites for new offers based on the users' preferences. When it identifies new offers, the application processes these offers and sends a detailed email to the user. This email includes all the necessary information about the offer, allowing users to quickly decide whether it matches their needs.
 
-- [ ] [Set up project integrations](https://gitlab.jakubk.pl/cloud/Qbason/boosearcher/-/settings/integrations)
+The core of BooSearcher's functionality lies in its ability to efficiently search and retrieve offers. The `BookingSearcher` component is at the heart of this process, utilizing advanced web scraping techniques to find and extract offer details from booking websites.
 
-## Collaborate with your team
+# Technology Stack Overview
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+BooSearcher leverages a modern technology stack designed for full-stack web development, automation, and seamless deployment. Here's a concise overview:
 
-## Test and Deploy
+- **Next.js**: Powers the UI and web application structure, enabling server-side rendering and static site generation for React apps.
+- **Prisma**: Facilitates database access and management, simplifying interactions with databases.
+- **React**: The core library for building UI components, utilized by Next.js.
+- **Puppeteer**: Automates web scraping and testing by controlling Chrome or Chromium via the DevTools Protocol.
+- **MongoDB**: A flexible and scalable NoSQL database for storing application data.
+- **Helm & Kubernetes**: Manage and orchestrate containerized application deployments in CI/CD pipelines.
+- **GitLab CI/CD**: Automates the build, test, and deployment processes, ensuring continuous integration and delivery.
+- **Nodemailer**: Enables the application to send emails, supporting features like notifications or password resets.
+- **NextUI**: Provides a collection of beautifully designed, customizable UI components.
+- **NextAuth.js**: Offers a complete authentication solution, making it easier to build secure systems.
+- **Dev Containers**: Utilize development containers to ensure a consistent development environment across all team members. This approach leverages Docker to create containerized environments that include all necessary dependencies and tools, streamlining the setup process and minimizing "works on my machine" issues.
 
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+This stack ensures BooSearcher is built on a foundation of cutting-edge technologies for robust, scalable web applications.
 
 ## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+We welcome contributions to BooSearcher! If you have suggestions for improvements or new features, please feel free to contribute. Check out our [contribution guidelines](CONTRIBUTING.md) for more information.
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+BooSearcher is released under the [MIT License](LICENSE). Feel free to use, modify, and distribute the application as per the license terms.
+
+## Acknowledgments
+
+A big thank you to everyone who has contributed to the development and improvement of BooSearcher. Your support and contributions have been invaluable.
+
+Start monitoring your favorite booking offers with BooSearcher today and never miss out on the best deals again!

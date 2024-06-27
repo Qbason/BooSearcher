@@ -1,0 +1,364 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+stages:
+  - Test
+  - Build
+  - Preparation
+  - Deploy
+  - PostTest
+
+image: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/node:latest
+
+#Default variables
+variables:
+  #Kubernetes
+  KUBE_CONTEXT: cloud/k8s:kub
+  NAMESPACE: $CI_PROJECT_NAMESPACE
+  DOMAIN: jakubk.pl
+  REGISTRY_SECRET_NAME: regcre
+  #Project
+  DOCKERFILE_PATH: ./ci/Dockerfile
+  #Docker
+  WEB_IMAGE_NAME: "nextjs"
+  WEB_IMAGE_REPO: $CI_REGISTRY_IMAGE/$WEB_IMAGE_NAME
+  WEB_DOCKERTAG: $CI_COMMIT_SHORT_SHA
+  #MongoDB
+  MONGO_INITDB_DATABASE: BookingBot
+  DEBUG: "false"
+  DATABASE_URL: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGODB_NAME}-headless/${MONGO_INITDB_DATABASE}?authSource=admin&directConnection=true"
+  #Tests
+  CI: "true"
+  #Auth
+  AUTH_TRUST_HOST: "true"
+  # EMAIL_SERVER_USER: username # from variables project
+  # EMAIL_SERVER_PASSWORD: password
+  EMAIL_SERVER_HOST: smtp.gmail.com
+  EMAIL_SERVER_PORT: 465
+  EMAIL_FROM: noreply@jakubk.pl
+  #Telemetry
+  NEXT_TELEMETRY_DISABLED: 1
+
+cache:
+  key: $CI_COMMIT_REF_SLUG
+  paths:
+    - node_modules/
+
+.topicVars:
+  variables:
+    ENVIRONMENT_NAME: topic
+    WEB_SHORT_URL: $CI_PROJECT_NAME.$ENVIRONMENT_NAME.$DOMAIN
+    NEXT_PUBLIC_API_URL: https://$WEB_SHORT_URL/api
+    AUTH_URL: $NEXT_PUBLIC_API_URL/auth
+    WEB_NAME: web-$CI_PROJECT_ID-$ENVIRONMENT_NAME
+    MONGODB_NAME: mongodb-$CI_PROJECT_ID-topic
+    DEBUG: "true"
+
+.devVars:
+  variables:
+    ENVIRONMENT_NAME: development
+    WEB_SHORT_URL: $CI_PROJECT_NAME.dev.$DOMAIN
+    NEXT_PUBLIC_API_URL: https://$WEB_SHORT_URL/api
+    AUTH_URL: $NEXT_PUBLIC_API_URL/auth
+    WEB_NAME: web-$CI_PROJECT_ID-dev
+    MONGODB_NAME: mongodb-$CI_PROJECT_ID-dev
+
+.prodVars:
+  variables:
+    WEB_IMAGE_NAME: "nextjs-prod"
+    ENVIRONMENT_NAME: production
+    WEB_SHORT_URL: $CI_PROJECT_NAME.$DOMAIN
+    NEXT_PUBLIC_API_URL: https://$WEB_SHORT_URL/api
+    AUTH_URL: $NEXT_PUBLIC_API_URL/auth
+    WEB_NAME: web-$CI_PROJECT_ID
+    MONGODB_NAME: mongodb-$CI_PROJECT_ID
+
+#Job templates
+
+.buildAndPushDockerImage:
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:latest
+  tags:
+    - docker
+  stage: Build
+  script:
+    - echo "Replacing environment variables in .env file"
+    - printenv > .env
+    - echo "Logging into dependency proxy"
+    - echo ${CI_DEPENDENCY_PROXY_PASSWORD} | docker login -u ${CI_DEPENDENCY_PROXY_USER} --password-stdin ${CI_DEPENDENCY_PROXY_SERVER}
+    - echo "Building the app"
+    - docker build -t ${CI_REGISTRY_IMAGE}/${WEB_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA} -f $DOCKERFILE_PATH .
+    - echo "Build completed on $(date)"
+    - echo "Logging into remote registry"
+    - echo $CI_DEPLOY_PASSWORD | docker login -u $CI_DEPLOY_USER --password-stdin ${CI_REGISTRY}
+    - echo "Logged into registry"
+    - echo "Pushing to registry"
+    - docker push ${CI_REGISTRY_IMAGE}/${WEB_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}
+    - echo "Pushed to registry on $(date)"
+    - echo "Removing pushed image"
+    - docker rmi ${CI_REGISTRY_IMAGE}/${WEB_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}
+  environment:
+    name: ${ENVIRONMENT_NAME}
+    action: prepare
+
+.baseKubernetes:
+  tags:
+    - kub
+  image: "registry.gitlab.com/gitlab-org/cluster-integration/cluster-applications:latest"
+  before_script:
+    - chmod 400 "$KUBECONFIG"
+    - gl-use-kube-context
+
+.diffHelm:
+  extends: .baseKubernetes
+  script:
+    - helm version
+    - gl-helmfile --file $CI_PROJECT_DIR/ci/helmfile.yaml diff --suppress-secrets
+  environment:
+    name: ${ENVIRONMENT_NAME}
+    action: prepare
+
+.deploy:
+  extends:
+    - .baseKubernetes
+  script:
+    - echo $MONGODB_NAME
+    - echo $WEB_NAME
+    - echo "Deploying to production server"
+    - gl-ensure-namespace $(echo $NAMESPACE | tr '/' '-')
+    - gl-helmfile --file $CI_PROJECT_DIR/ci/helmfile.yaml sync
+  environment:
+    name: ${ENVIRONMENT_NAME}
+    action: start
+    url: https://${WEB_SHORT_URL}
+
+.restrictAndApplyVarsToBranchTopic:
+  extends: .topicVars
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^topic0/
+      variables:
+        ENVIRONMENT_NAME: topic0
+    - if: $CI_COMMIT_BRANCH =~ /^topic1/
+      variables:
+        ENVIRONMENT_NAME: topic1
+    - if: $CI_COMMIT_BRANCH =~ /^topic2/
+      variables:
+        ENVIRONMENT_NAME: topic2
+    - if: $CI_COMMIT_BRANCH =~ /^topic3/
+      variables:
+        ENVIRONMENT_NAME: topic3
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+
+.restrictAndApplyVarsToBranchDev:
+  extends: .devVars
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+
+.restrictAndApplyVarsToBranchProd:
+  extends: .prodVars
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+
+.updImgRepCredentials:
+  tags:
+    - kub
+  stage: Preparation
+  image:
+    name: bitnami/kubectl:latest
+    entrypoint: [""]
+  script:
+    - kubectl config use-context $KUBE_CONTEXT
+    - |
+      kubectl create secret docker-registry $REGISTRY_SECRET_NAME \
+        --namespace $(echo $NAMESPACE | tr '/' '-') \
+        --docker-server=${CI_REGISTRY} \
+        --docker-username=${CI_DEPLOY_USER} \
+        --docker-password=${CI_DEPLOY_PASSWORD} \
+        --save-config \
+        --dry-run=client \
+        -o yaml | kubectl apply -f -
+  when: manual
+
+.test:
+  tags:
+    - kub
+  stage: Test
+  script:
+    - echo "Testing the app ${ENVIRONMENT_NAME} environment"
+    - npm ci
+    - npx prisma generate
+    - npm run lint
+
+.postTest:
+  tags:
+    - kub
+  stage: PostTest
+  image: mcr.microsoft.com/playwright:v1.42.0-jammy
+  parallel: 2
+  script:
+    - echo "Replacing environment variables in .env file"
+    - printenv > .env
+    - echo "Testing the app environment"
+    - npm ci
+    - npx prisma generate
+    - npx playwright test --shard=$CI_NODE_INDEX/$CI_NODE_TOTAL
+  needs:
+    - deploy:dev
+  artifacts:
+    when: on_failure
+    paths:
+      - ./playwright-report
+      - ./test-results/
+    expire_in: 2 days
+  environment:
+    name: ${ENVIRONMENT_NAME}
+    action: verify
+
+# Jobs
+
+#TEST STAGE
+testTopic:
+  stage: Test
+  extends:
+    - .restrictAndApplyVarsToBranchTopic
+    - .test
+
+testDev:
+  stage: Test
+  extends:
+    - .restrictAndApplyVarsToBranchDev
+    - .test
+
+testProd:
+  stage: Test
+  extends:
+    - .restrictAndApplyVarsToBranchProd
+    - .test
+
+testAnyAndBuildLocally:
+  stage: Test
+  tags:
+    - kub
+  script:
+    - echo "Testing and building locally the app"
+    - npm ci
+    - npx prisma generate
+    - npm run lint
+    - npm run build
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "main" && $CI_COMMIT_BRANCH != "dev" && $CI_COMMIT_BRANCH !~ /^topic/'
+
+#BUILD STAGE
+buildAndPushDockerImageTopic:
+  extends:
+    - .restrictAndApplyVarsToBranchTopic
+    - .buildAndPushDockerImage
+  needs:
+    - testTopic
+
+buildAndPushDockerImageDev:
+  extends:
+    - .restrictAndApplyVarsToBranchDev
+    - .buildAndPushDockerImage
+  needs:
+    - testDev
+
+buildAndPushDockerImageProd:
+  extends:
+    - .restrictAndApplyVarsToBranchProd
+    - .buildAndPushDockerImage
+  needs:
+    - testProd
+
+#PREPARATION STAGE
+
+updImgRepCredentials:
+  extends:
+    - .updImgRepCredentials
+
+# DEPLOY STAGE
+
+diffHelm:topic:
+  extends:
+    - .restrictAndApplyVarsToBranchTopic
+    - .diffHelm
+  needs:
+    - buildAndPushDockerImageTopic
+  stage: Deploy
+
+deploy:topic:
+  extends:
+    - .restrictAndApplyVarsToBranchTopic
+    - .deploy
+  needs:
+    - diffHelm:topic
+  stage: Deploy
+
+diffHelm:dev:
+  extends:
+    - .restrictAndApplyVarsToBranchDev
+    - .diffHelm
+  needs:
+    - buildAndPushDockerImageDev
+  stage: Deploy
+
+deploy:dev:
+  stage: Deploy
+  extends:
+    - .restrictAndApplyVarsToBranchDev
+    - .deploy
+  needs:
+    - diffHelm:dev
+  when: manual
+
+diffHelm:prod:
+  stage: Deploy
+  extends:
+    - .restrictAndApplyVarsToBranchProd
+    - .diffHelm
+  needs:
+    - buildAndPushDockerImageProd
+
+deploy:prod:
+  stage: Deploy
+  extends:
+    - .restrictAndApplyVarsToBranchProd
+    - .deploy
+  needs:
+    - diffHelm:prod
+  resource_group: production
+  when: manual
+
+#POST TEST STAGE
+
+PostTestTopic:
+  stage: PostTest
+  extends:
+    - .restrictAndApplyVarsToBranchTopic
+    - .postTest
+  needs:
+    - deploy:topic
+
+PostTestDev:
+  stage: PostTest
+  extends:
+    - .restrictAndApplyVarsToBranchDev
+    - .postTest
+  needs:
+    - deploy:dev
+
+PostTestProd:
+  stage: PostTest
+  extends:
+    - .restrictAndApplyVarsToBranchProd
+    - .postTest
+  needs:
+    - deploy:prod
